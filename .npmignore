@@ -1,0 +1,14 @@
+# Source and config are excluded from the published tarball; only `dist`
+# (declared via the package.json "files" field) is shipped.
+src
+node_modules
+coverage
+*.tsbuildinfo
+tsconfig.json
+tsconfig.node.json
+vite.config.ts
+vitest.config.ts
+eslint.config.ts
+.gitignore
+.github
+*.log

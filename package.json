@@ -1,0 +1,70 @@
+{
+  "name": "@umutcangungormus/vue-import-export",
+  "version": "0.1.0",
+  "description": "Vue 3 + TypeScript UI components and contract layer for the umutcangungormus/laravel-import-export backend (v1/imports API).",
+  "type": "module",
+  "license": "MIT",
+  "author": "Umut Can Gungormus",
+  "keywords": [
+    "vue",
+    "vue3",
+    "import",
+    "export",
+    "csv",
+    "laravel",
+    "pinia"
+  ],
+  "main": "./dist/vue-import-export.cjs",
+  "module": "./dist/vue-import-export.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/vue-import-export.js",
+      "require": "./dist/vue-import-export.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "dev": "vite",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && vue-tsc -b --force && vite build",
+    "test": "vitest",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint . --ext .ts,.vue"
+  },
+  "peerDependencies": {
+    "@heroicons/vue": "^2",
+    "pinia": "^3",
+    "vue": "^3.5",
+    "vue-i18n": "^11"
+  },
+  "peerDependenciesMeta": {
+    "vue-i18n": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "axios": "^1.7.0"
+  },
+  "devDependencies": {
+    "@heroicons/vue": "^2.1.5",
+    "@types/node": "^22.19.21",
+    "@vitejs/plugin-vue": "^5.2.0",
+    "@vue/test-utils": "^2.4.6",
+    "eslint": "^9.14.0",
+    "eslint-plugin-vue": "^9.30.0",
+    "jsdom": "^25.0.1",
+    "pinia": "^3.0.0",
+    "typescript": "~5.6.0",
+    "typescript-eslint": "^8.13.0",
+    "vite": "^6.0.0",
+    "vitest": "^3.2.6",
+    "vue": "^3.5.0",
+    "vue-tsc": "^2.1.10"
+  }
+}
