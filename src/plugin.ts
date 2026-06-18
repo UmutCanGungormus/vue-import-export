@@ -4,7 +4,7 @@
  * Usage:
  * ```ts
  * import { createApp } from 'vue'
- * import { createImportExport, createAxiosImportClient } from '@umutcangungormus/vue-import-export'
+ * import { createImportExport, createAxiosImportClient } from '@umut-can-gungormus/vue-import-export'
  *
  * app.use(createImportExport({
  *   apiClient: createAxiosImportClient({ baseURL: '/api', getToken: () => token }),

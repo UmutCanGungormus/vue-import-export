@@ -1,5 +1,5 @@
 /**
- * @umutcangungormus/vue-import-export
+ * @umut-can-gungormus/vue-import-export
  *
  * Public entry point. Re-exports the contract layer (types, API interface +
  * default factory, adapters/composables, plugin), the Vue components, and the

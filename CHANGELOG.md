@@ -27,4 +27,4 @@ Initial public release.
   `APIImportTemplate`, payloads, etc.).
 - ES + CJS builds with bundled TypeScript declarations.
 
-[0.1.0]: https://github.com/umutcangungormus/vue-import-export/releases/tag/v0.1.0
+[0.1.0]: https://github.com/UmutCanGungormus/vue-import-export/releases/tag/v0.1.0

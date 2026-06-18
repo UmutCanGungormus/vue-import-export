@@ -6,11 +6,11 @@
 
 A complete import workflow — drag-and-drop upload, server-side header detection, column→field mapping with confidence scoring, progress tracking, failure export, and reusable templates — as drop-in components, plus clean seams to bring your own HTTP client, i18n, and notifications.
 
-[![CI](https://github.com/umutcangungormus/vue-import-export/actions/workflows/ci.yml/badge.svg)](https://github.com/umutcangungormus/vue-import-export/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/@umutcangungormus/vue-import-export.svg?style=flat-square)](https://www.npmjs.com/package/@umutcangungormus/vue-import-export)
+[![CI](https://github.com/UmutCanGungormus/vue-import-export/actions/workflows/ci.yml/badge.svg)](https://github.com/UmutCanGungormus/vue-import-export/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/@umut-can-gungormus/vue-import-export.svg?style=flat-square)](https://www.npmjs.com/package/@umut-can-gungormus/vue-import-export)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-42b883.svg?style=flat-square&logo=vuedotjs)](https://vuejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6.svg?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![License: MIT](https://img.shields.io/npm/l/@umutcangungormus/vue-import-export.svg?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/npm/l/@umut-can-gungormus/vue-import-export.svg?style=flat-square)](LICENSE)
 
 </div>
 
@@ -40,7 +40,7 @@ A complete import workflow — drag-and-drop upload, server-side header detectio
 
 UI libraries usually couple themselves to *your* HTTP client, *your* i18n, and *your* toast system — so they fight your app instead of fitting it. This one inverts that: components depend only on a small set of **injectable seams** with safe defaults. Use the batteries-included axios client and `vue-i18n` bridge, or swap in a `fetch` client, a mock for tests, or no i18n at all — without forking a single component.
 
-It is the **frontend counterpart** to the [`umutcangungormus/laravel-import-export`](https://github.com/umutcangungormus/laravel-import-export) Laravel package and speaks its `v1/imports` API out of the box.
+It is the **frontend counterpart** to the [`umutcangungormus/laravel-import-export`](https://github.com/UmutCanGungormus/laravel-import-export) Laravel package and speaks its `v1/imports` API out of the box.
 
 ## Features
 
@@ -69,7 +69,7 @@ This package declares the following peers (your app installs them):
 ## Installation
 
 ```bash
-npm i @umutcangungormus/vue-import-export
+npm i @umut-can-gungormus/vue-import-export
 ```
 
 ### Tailwind CSS v4 (required for styling)
@@ -79,12 +79,12 @@ The components are styled with **Tailwind CSS v4** utility classes. Those classe
 ```css
 /* app.css — Tailwind v4 uses @source */
 @import "tailwindcss";
-@source "../node_modules/@umutcangungormus/vue-import-export/dist/**/*.{js,mjs}";
+@source "../node_modules/@umut-can-gungormus/vue-import-export/dist/**/*.{js,mjs}";
 ```
 
 ```ts
 // Component styles (required for the bundled UI components)
-import '@umutcangungormus/vue-import-export/style.css'
+import '@umut-can-gungormus/vue-import-export/style.css'
 ```
 
 > On Tailwind v3, add the same glob to `content` in `tailwind.config.js` instead. Without this step the components render unstyled.
@@ -99,8 +99,8 @@ import { createPinia } from 'pinia'
 import {
   createImportExport,
   createAxiosImportClient,
-} from '@umutcangungormus/vue-import-export'
-import '@umutcangungormus/vue-import-export/style.css'
+} from '@umut-can-gungormus/vue-import-export'
+import '@umut-can-gungormus/vue-import-export/style.css'
 import App from './App.vue'
 
 const app = createApp(App)
@@ -132,8 +132,8 @@ app.mount('#app')
 
 ```vue
 <script setup lang="ts">
-import { ImportManager } from '@umutcangungormus/vue-import-export'
-import type { APIImport } from '@umutcangungormus/vue-import-export'
+import { ImportManager } from '@umut-can-gungormus/vue-import-export'
+import type { APIImport } from '@umut-can-gungormus/vue-import-export'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -166,7 +166,7 @@ import {
   ColumnMappingModal,
   LogoUploadInput,
   useImportStore,
-} from '@umutcangungormus/vue-import-export'
+} from '@umut-can-gungormus/vue-import-export'
 ```
 
 The Pinia store (`useImportStore`) exposes the import sessions, the active mapping session, and async actions that call the injected `ImportApiClient`.
@@ -261,7 +261,7 @@ A specialized single-image upload variant for logos/avatars.
 
 ## Backend
 
-This package is the frontend client for the Laravel package [`umutcangungormus/laravel-import-export`](https://github.com/umutcangungormus/laravel-import-export), which exposes the import API (initialize import, detect headers, suggest and confirm mappings, run the import, summarize/export failures, and manage reusable mapping templates). Install and configure that package on the server, then point `createAxiosImportClient({ baseURL })` at it.
+This package is the frontend client for the Laravel package [`umutcangungormus/laravel-import-export`](https://github.com/UmutCanGungormus/laravel-import-export), which exposes the import API (initialize import, detect headers, suggest and confirm mappings, run the import, summarize/export failures, and manage reusable mapping templates). Install and configure that package on the server, then point `createAxiosImportClient({ baseURL })` at it.
 
 ## Scripts
 
@@ -279,6 +279,6 @@ The MIT License (MIT). See [LICENSE](LICENSE).
 
 <div align="center">
 
-Built with care by [Umut Can Gungormus](https://github.com/umutcangungormus).
+Built with care by [Umut Can Gungormus](https://github.com/UmutCanGungormus).
 
 </div>
