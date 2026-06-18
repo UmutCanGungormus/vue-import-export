@@ -61,6 +61,8 @@ import {
   createImportExport,
   createAxiosImportClient,
 } from '@umutcangungormus/vue-import-export'
+// Component styles (required for the bundled UI components).
+import '@umutcangungormus/vue-import-export/style.css'
 import App from './App.vue'
 
 const app = createApp(App)

@@ -23,12 +23,15 @@
       "import": "./dist/vue-import-export.js",
       "require": "./dist/vue-import-export.cjs"
     },
+    "./style.css": "./dist/vue-import-export.css",
     "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "dev": "vite",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
