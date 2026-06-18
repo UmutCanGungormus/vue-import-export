@@ -5,6 +5,14 @@
   "type": "module",
   "license": "MIT",
   "author": "Umut Can Gungormus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UmutCanGungormus/vue-import-export.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UmutCanGungormus/vue-import-export/issues"
+  },
+  "homepage": "https://github.com/UmutCanGungormus/vue-import-export#readme",
   "keywords": [
     "vue",
     "vue3",
@@ -32,13 +40,17 @@
   "sideEffects": [
     "**/*.css"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && vue-tsc -b --force && vite build",
     "test": "vitest",
     "typecheck": "vue-tsc --noEmit",
-    "lint": "eslint . --ext .ts,.vue"
+    "lint": "eslint . --ext .ts,.vue",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "@heroicons/vue": "^2",
