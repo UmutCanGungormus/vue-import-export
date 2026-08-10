@@ -109,7 +109,8 @@
                         :options="headerOptions"
                         :placeholder="t('selectColumnFromFile', { default: 'Select a column from file' })"
                         :searchable="true"
-                        @update:modelValue="handleMappingChange(mapping.target_field, $event as string)"
+                        :clearable="true"
+                        @update:modelValue="handleMappingChange(mapping.target_field, $event)"
                       />
                     </td>
 
@@ -119,14 +120,14 @@
                         <div class="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
                           <div
                             class="h-full rounded-full transition-all duration-500 ease-out"
-                            :class="getScoreColor(mapping.confidence_score)"
-                            :style="{ width: Math.max(scorePercent(mapping.confidence_score), 5) + '%' }"
+                            :class="getScoreColor(scores[mapping.target_field])"
+                            :style="{ width: Math.max(scorePercent(scores[mapping.target_field]), 5) + '%' }"
                           ></div>
                         </div>
                         <span
                           class="text-xs font-semibold w-[40px] text-right"
-                          :class="getScoreTextColor(mapping.confidence_score)"
-                        >%{{ scorePercent(mapping.confidence_score) }}</span>
+                          :class="getScoreTextColor(scores[mapping.target_field])"
+                        >%{{ scorePercent(scores[mapping.target_field]) }}</span>
                       </div>
                       <div v-else class="h-2.5"></div>
                     </td>
@@ -135,11 +136,11 @@
                     <td class="py-3.5 text-center">
                       <div class="flex items-center justify-center">
                         <CheckCircleIcon
-                          v-if="localMappings[mapping.target_field] && mapping.confidence_score >= 0.4"
+                          v-if="localMappings[mapping.target_field] && scores[mapping.target_field] >= 0.4"
                           class="w-5 h-5 text-green-500"
                         />
                         <ExclamationTriangleIcon
-                          v-else-if="localMappings[mapping.target_field] && mapping.confidence_score < 0.4"
+                          v-else-if="localMappings[mapping.target_field] && scores[mapping.target_field] < 0.4"
                           class="w-5 h-5 text-orange-400"
                         />
                         <ExclamationCircleIcon
@@ -230,6 +231,7 @@ import {
 } from '@heroicons/vue/24/solid'
 import SelectInput from './inputs/SelectInput.vue'
 import { useTranslate } from '../adapters'
+import { scoreColumnMatch } from '../utils/columnMatch'
 import type { APIImportMapping } from '../types'
 
 defineOptions({
@@ -328,6 +330,67 @@ function getFieldLabel(field: string): string {
   // falling back to the bundled Turkish defaults, then the raw field key.
   return t(`field.${field}`, { default: fieldLabels[field] || field })
 }
+
+/**
+ * Composite key for the score lookup below.
+ *
+ * The unit separator cannot occur in a spreadsheet header or a field key, so no
+ * pair of values can collide on it.
+ *
+ * @param sourceColumn File header
+ * @param targetField  Target field key
+ * @return The map key for that pair
+ */
+function pairKey(sourceColumn: string, targetField: string): string {
+  return `${sourceColumn}\u001f${targetField}`
+}
+
+/**
+ * Backend confidence per (source column, target field) pair.
+ *
+ * The session carries one mapping per detected header, so the score the backend
+ * computed is recoverable for any pair it actually looked at — not just for the
+ * column it ended up choosing.
+ */
+const backendScores = computed(() => {
+  const byPair = new Map<string, number>()
+  for (const m of props.mappings) {
+    if (!m.target_field || !m.source_column) continue
+    byPair.set(pairKey(m.source_column, m.target_field), m.confidence_score)
+  }
+  return byPair
+})
+
+/**
+ * Match score of what is currently selected, per target field.
+ *
+ * The stored `confidence_score` describes the column the backend picked, so it
+ * goes stale the moment the user points a field somewhere else — leaving a
+ * deliberate manual mapping wearing the old column's percentage. Pairs the
+ * backend already scored keep its number verbatim (it knows the field's aliases,
+ * which the client does not); anything else is scored locally with the same
+ * formula. See {@link scoreColumnMatch}.
+ */
+const scores = computed<Record<string, number>>(() => {
+  const result: Record<string, number> = {}
+
+  for (const mapping of dedupedMappings.value) {
+    const selected = localMappings.value[mapping.target_field]
+    if (!selected) {
+      result[mapping.target_field] = 0
+      continue
+    }
+
+    const known = backendScores.value.get(pairKey(selected, mapping.target_field))
+    result[mapping.target_field] =
+      known ??
+      scoreColumnMatch(selected, mapping.target_field, {
+        label: getFieldLabel(mapping.target_field),
+      }).score
+  }
+
+  return result
+})
 
 function scorePercent(score: number): number {
   return Math.round(score * 100)

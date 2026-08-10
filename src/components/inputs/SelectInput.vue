@@ -8,10 +8,26 @@
       aria-haspopup="listbox"
       @click="toggle"
     >
-      <span :class="selectedLabel ? 'text-[#364152] truncate' : 'text-[#9AA4B2] truncate'">
+      <!-- Right padding reserves the strip the overlaid clear button sits in. -->
+      <span
+        class="truncate"
+        :class="[selectedLabel ? 'text-[#364152]' : 'text-[#9AA4B2]', { 'pr-6': showClear }]"
+      >
         {{ selectedLabel || placeholder || t('select', { default: 'Select' }) }}
       </span>
       <ChevronUpDownIcon class="w-4 h-4 text-[#9AA4B2] flex-shrink-0" />
+    </button>
+
+    <!-- Sibling of the trigger, not a child: a button may not nest another. -->
+    <button
+      v-if="showClear"
+      type="button"
+      class="absolute right-8 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-[#9AA4B2] hover:text-[#364152] hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-[#3344ee] transition"
+      :aria-label="t('clearSelection', { default: 'Clear selection' })"
+      data-testid="select-clear"
+      @click.stop="clear"
+    >
+      <XMarkIcon class="w-3.5 h-3.5" />
     </button>
 
     <div
@@ -31,6 +47,17 @@
       </div>
 
       <ul class="py-1">
+        <li
+          v-if="showClear"
+          class="px-3 py-2 text-sm cursor-pointer flex items-center gap-2 text-[#4B5565] hover:bg-gray-50 border-b border-gray-100"
+          role="option"
+          :aria-selected="false"
+          data-testid="select-clear-option"
+          @click="clear"
+        >
+          <XMarkIcon class="w-3.5 h-3.5 flex-shrink-0 text-[#9AA4B2]" />
+          <span class="truncate">{{ t('clearSelection', { default: 'Clear selection' }) }}</span>
+        </li>
         <li v-if="filteredOptions.length === 0" class="px-3 py-2 text-sm text-[#9AA4B2] select-none">
           {{ t('noOptions', { default: 'No options' }) }}
         </li>
@@ -60,7 +87,7 @@
  * Consumed by {@link ColumnMappingModal} for the per-row file-header picker.
  */
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { ChevronUpDownIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { ChevronUpDownIcon, CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useTranslate } from '../../adapters.js'
 
 export interface SelectOption {
@@ -75,11 +102,18 @@ const props = withDefaults(
     placeholder?: string
     searchable?: boolean
     disabled?: boolean
+    /**
+     * Offer a way back to "nothing selected": an ✕ on the trigger and a clear
+     * entry at the top of the list. Without it a value, once picked, can only
+     * ever be swapped for another one.
+     */
+    clearable?: boolean
   }>(),
   {
     placeholder: '',
     searchable: false,
     disabled: false,
+    clearable: false,
   },
 )
 
@@ -110,9 +144,19 @@ function toggle() {
   open.value = !open.value
 }
 
-function select(value: string) {
+/** Whether a clear affordance applies: enabled, and something to clear. */
+const showClear = computed(
+  () => props.clearable && !props.disabled && props.modelValue !== null && props.modelValue !== '',
+)
+
+function select(value: string | null) {
   emit('update:modelValue', value)
   open.value = false
+}
+
+/** Return the input to its unselected state. */
+function clear() {
+  select(null)
 }
 
 watch(open, async (isOpen) => {
