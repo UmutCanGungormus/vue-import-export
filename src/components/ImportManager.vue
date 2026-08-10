@@ -346,10 +346,20 @@ async function handleDelete() {
   }
 }
 
+/** Guards against a second export while the first download is still resolving. */
+const exporting = ref(false)
+
 async function handleExport() {
-  const model = importStore.filterModel || props.defaultExportModel
-  await importStore.exportData(model)
-  notify({ type: 'success', message: t('exportStarted', { default: 'Dışa aktarma başlatıldı' }) })
+  if (exporting.value) return
+
+  exporting.value = true
+  try {
+    const model = importStore.filterModel || props.defaultExportModel
+    await importStore.exportData(model)
+    notify({ type: 'success', message: t('exportStarted', { default: 'Dışa aktarma başlatıldı' }) })
+  } finally {
+    exporting.value = false
+  }
 }
 
 // --- Error helpers -----------------------------------------------------------
@@ -542,6 +552,25 @@ function getStatusLabel(status: string): string {
                 importStore.uploading
                   ? t('uploadingFile', { default: 'Yükleniyor' })
                   : t('upload', { default: 'Yükle' })
+              }}
+            </button>
+
+            <!--
+              Exporting reads model data, which has nothing to do with how many
+              import sessions the table below happens to list. Kept in this
+              always-rendered column so no row count or filter can hide it.
+            -->
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium text-[#4B5565] border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              :disabled="exporting"
+              @click="handleExport"
+            >
+              <ArrowDownTrayIcon class="w-4 h-4" />
+              {{
+                exporting
+                  ? t('exportingData', { default: 'Dışa aktarılıyor' })
+                  : t('export', { default: 'Dışa aktar' })
               }}
             </button>
           </div>
@@ -739,18 +768,7 @@ function getStatusLabel(status: string): string {
           :total-items="importStore.totalItems"
           @update:current-page="importStore.setPage"
           @update:per-page="importStore.setPerPage"
-        >
-          <template #actions>
-            <button
-              type="button"
-              class="inline-flex items-center gap-2 h-8 px-3 text-sm font-medium text-[#4B5565] border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-              @click="handleExport"
-            >
-              <ArrowDownTrayIcon class="w-4 h-4" />
-              {{ t('export', { default: 'Export' }) }}
-            </button>
-          </template>
-        </ImportPagination>
+        />
       </template>
     </div>
 
