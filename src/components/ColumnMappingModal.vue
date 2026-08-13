@@ -21,7 +21,15 @@
       @mousedown="onBackdropMousedown"
       @click="onBackdropClick"
     >
-      <div class="w-full max-w-4xl" @click.stop>
+      <!--
+        Propagation is deliberately not stopped here: SelectInput closes itself
+        from a document-level click listener, so a `.stop` on this wrapper left
+        every row's dropdown open at once, stacked on top of each other. The
+        backdrop still only closes on a press that both started and ended on it
+        (see onBackdropMousedown / onBackdropClick), so letting clicks bubble
+        does not close the modal.
+      -->
+      <div class="w-full max-w-4xl">
         <div
           ref="modalContentRef"
           class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden max-h-[90vh]"
