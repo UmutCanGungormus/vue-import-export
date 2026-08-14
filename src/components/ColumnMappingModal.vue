@@ -59,11 +59,47 @@
           <!-- Body -->
           <div class="flex-1 flex flex-col overflow-y-auto min-h-0">
             <div class="px-6 py-4 overflow-y-auto max-h-[60vh]">
+              <!-- Search + scope -->
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <div class="relative flex-1 min-w-[180px]">
+                  <MagnifyingGlassIcon
+                    class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9AA4B2]"
+                  />
+                  <input
+                    v-model="search"
+                    type="text"
+                    class="w-full h-9 pl-8 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#3344ee] focus:border-[#3344ee]"
+                    :placeholder="t('searchFields', { default: 'Search fields' })"
+                    data-testid="field-search"
+                  />
+                </div>
+                <div class="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+                  <button
+                    type="button"
+                    class="px-2.5 py-2 transition"
+                    :class="filterMode === 'relevant' ? 'bg-[#EFF4FF] text-[#3344ee] font-semibold' : 'bg-white text-[#4B5565]'"
+                    data-testid="filter-relevant"
+                    @click="filterMode = 'relevant'"
+                  >
+                    {{ t('relevantFields', { default: 'Mapped + required' }) }}
+                  </button>
+                  <button
+                    type="button"
+                    class="px-2.5 py-2 border-l border-gray-200 transition"
+                    :class="filterMode === 'all' ? 'bg-[#EFF4FF] text-[#3344ee] font-semibold' : 'bg-white text-[#4B5565]'"
+                    data-testid="filter-all"
+                    @click="filterMode = 'all'"
+                  >
+                    {{ t('allFields', { default: 'All fields' }) }}
+                  </button>
+                </div>
+              </div>
+
               <!-- Mapping summary -->
               <div class="flex items-center gap-4 mb-4 px-1">
                 <div class="flex items-center gap-1.5 text-xs text-[#4B5565]">
                   <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                  {{ mappedCount }}/{{ dedupedMappings.length }} {{ t('mapped', { default: 'mapped' }) }}
+                  {{ mappedCount }}/{{ rows.length }} {{ t('mapped', { default: 'mapped' }) }}
                 </div>
                 <div
                   v-if="requiredUnmappedCount > 0"
@@ -72,6 +108,23 @@
                   <span class="w-2 h-2 rounded-full bg-red-400"></span>
                   {{ requiredUnmappedCount }} {{ t('requiredUnmapped', { default: 'required unmapped' }) }}
                 </div>
+              </div>
+
+              <!-- A header that changed owner says so, and can be put back -->
+              <div
+                v-if="lastMove"
+                class="flex items-center justify-between gap-3 mb-3 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50"
+                data-testid="header-moved"
+              >
+                <p class="text-xs text-amber-800">{{ moveNotice }}</p>
+                <button
+                  type="button"
+                  class="text-xs font-semibold text-amber-900 hover:underline whitespace-nowrap"
+                  data-testid="undo-move"
+                  @click="undoMove"
+                >
+                  {{ t('undoMove', { default: 'Undo' }) }}
+                </button>
               </div>
 
               <table class="w-full">
@@ -92,78 +145,74 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
-                    v-for="mapping in dedupedMappings"
-                    :key="mapping.id"
-                    class="border-b border-gray-100 transition-colors"
-                    :class="{ 'bg-red-50/30': mapping.is_required && !localMappings[mapping.target_field] }"
-                  >
-                    <!-- System Field -->
-                    <td class="py-3.5 pr-4">
-                      <div>
-                        <span class="text-sm font-medium text-[#364152]">{{ getFieldLabel(mapping.target_field) }}</span>
-                        <span class="block text-xs text-[#9AA4B2] mt-0.5">{{ mapping.target_field }}</span>
-                        <span
-                          v-if="mapping.is_required"
-                          class="inline-block mt-1 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded"
-                        >{{ t('required', { default: 'Required' }) }}</span>
-                      </div>
-                    </td>
+                  <template v-for="section in sections" :key="section.key || 'flat'">
+                    <!-- Section header: a repeating group, foldable -->
+                    <tr v-if="section.collapsible" class="border-b border-gray-100 bg-gray-50/60">
+                      <td colspan="4" class="py-2">
+                        <button
+                          type="button"
+                          class="w-full flex items-center gap-2 text-left"
+                          :aria-expanded="isExpanded(section.key)"
+                          :aria-label="isExpanded(section.key)
+                            ? t('collapseSection', { default: 'Collapse' })
+                            : t('expandSection', { default: 'Expand' })"
+                          :data-testid="`section-toggle-${section.key}`"
+                          @click="toggleGroup(section.key)"
+                        >
+                          <ChevronDownIcon
+                            class="w-4 h-4 text-[#697586] transition-transform"
+                            :class="{ '-rotate-90': !isExpanded(section.key) }"
+                          />
+                          <span class="text-sm font-semibold text-[#364152]">{{ section.label }}</span>
+                          <span class="text-[11px] text-[#697586]">
+                            {{ section.slotCount }} {{ t('slots', { default: 'slots' }) }} ·
+                            {{ section.mappedCount }} {{ t('mapped', { default: 'mapped' }) }}
+                          </span>
+                          <span
+                            v-if="section.requiredUnmappedCount"
+                            class="text-[11px] font-semibold text-red-500"
+                          >
+                            · {{ section.requiredUnmappedCount }}
+                            {{ t('requiredUnmapped', { default: 'required unmapped' }) }}
+                          </span>
+                        </button>
+                      </td>
+                    </tr>
 
-                    <!-- File Header Dropdown -->
-                    <td class="py-3.5 pr-4">
-                      <SelectInput
-                        :modelValue="localMappings[mapping.target_field] || null"
-                        :options="headerOptions"
-                        :placeholder="t('selectColumnFromFile', { default: 'Select a column from file' })"
-                        :searchable="true"
-                        :clearable="true"
-                        @update:modelValue="handleMappingChange(mapping.target_field, $event)"
-                      />
-                    </td>
+                    <template v-if="isExpanded(section.key)">
+                      <template v-for="slot in section.slots" :key="`${section.key}-${slot.index}`">
+                        <!-- Slot divider: "2. Work experience" -->
+                        <tr v-if="section.collapsible" class="border-b border-gray-100">
+                          <td colspan="4" class="pt-3 pb-1">
+                            <span class="text-[11px] font-semibold uppercase tracking-wide text-[#9AA4B2]">
+                              {{ slot.index + 1 }}. {{ section.label }}
+                            </span>
+                          </td>
+                        </tr>
 
-                    <!-- Match Score -->
-                    <td class="py-3.5 pr-4">
-                      <div v-if="localMappings[mapping.target_field]" class="flex items-center gap-2">
-                        <div class="flex-1 h-2.5 rounded-full bg-gray-100 overflow-hidden">
-                          <div
-                            class="h-full rounded-full transition-all duration-500 ease-out"
-                            :class="getScoreColor(scores[mapping.target_field])"
-                            :style="{ width: Math.max(scorePercent(scores[mapping.target_field]), 5) + '%' }"
-                          ></div>
-                        </div>
-                        <span
-                          class="text-xs font-semibold w-[40px] text-right"
-                          :class="getScoreTextColor(scores[mapping.target_field])"
-                        >%{{ scorePercent(scores[mapping.target_field]) }}</span>
-                      </div>
-                      <div v-else class="h-2.5"></div>
-                    </td>
+                        <MappingFieldRow
+                          v-for="row in slot.rows"
+                          :key="row.target"
+                          :row="row"
+                          :selected="localMappings[row.target] || null"
+                          :score="scores[row.target] ?? 0"
+                          :header-options="headerOptions"
+                          :taken-by="takenBy"
+                          @assign="assignHeader"
+                        />
+                      </template>
+                    </template>
+                  </template>
 
-                    <!-- Status -->
-                    <td class="py-3.5 text-center">
-                      <div class="flex items-center justify-center">
-                        <CheckCircleIcon
-                          v-if="localMappings[mapping.target_field] && scores[mapping.target_field] >= 0.4"
-                          class="w-5 h-5 text-green-500"
-                        />
-                        <ExclamationTriangleIcon
-                          v-else-if="localMappings[mapping.target_field] && scores[mapping.target_field] < 0.4"
-                          class="w-5 h-5 text-orange-400"
-                        />
-                        <ExclamationCircleIcon
-                          v-else-if="mapping.is_required && !localMappings[mapping.target_field]"
-                          class="w-5 h-5 text-red-400"
-                        />
-                        <MinusCircleIcon
-                          v-else
-                          class="w-5 h-5 text-gray-300"
-                        />
-                      </div>
+                  <tr v-if="!visibleRows.length">
+                    <td colspan="4" class="py-6 text-center text-sm text-[#9AA4B2]">
+                      {{ t('noFieldsMatchSearch', { default: 'No field matches your search.' }) }}
                     </td>
                   </tr>
                 </tbody>
               </table>
+
+              <UnmappedColumnsPanel :headers="unmappedHeaders" />
             </div>
 
             <!-- Footer -->
@@ -171,6 +220,14 @@
               <p v-if="!allRequiredMapped" class="text-xs text-red-500 flex items-center gap-1">
                 <ExclamationCircleIcon class="w-4 h-4 flex-shrink-0" />
                 {{ t('allRequiredFieldsMustBeMapped', { default: 'All required fields must be mapped.' }) }}
+                <button
+                  type="button"
+                  class="font-semibold underline"
+                  data-testid="reveal-required"
+                  @click="revealRequiredUnmapped"
+                >
+                  {{ t('showRequiredUnmapped', { default: 'Show missing required fields' }) }}
+                </button>
               </p>
               <p v-else class="text-xs text-green-600 flex items-center gap-1">
                 <CheckCircleIcon class="w-4 h-4 flex-shrink-0" />
@@ -230,17 +287,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
-import {
-  CheckCircleIcon,
-  ExclamationCircleIcon,
-  ExclamationTriangleIcon,
-  MinusCircleIcon,
-} from '@heroicons/vue/24/solid'
-import SelectInput from './inputs/SelectInput.vue'
+import { computed, ref, watch, onUnmounted, nextTick } from 'vue'
+import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/vue/24/solid'
+import { ChevronDownIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
+import MappingFieldRow from './mapping/MappingFieldRow.vue'
+import UnmappedColumnsPanel from './mapping/UnmappedColumnsPanel.vue'
 import { useTranslate } from '../adapters'
-import { scoreColumnMatch } from '../utils/columnMatch'
-import type { APIImportMapping } from '../types'
+import { useColumnMapping } from '../composables/useColumnMapping'
+import { fillPlaceholders } from '../utils/i18n'
+import type { APIImportField, APIImportMapping, MappingColumnUpdate } from '../types'
 
 defineOptions({
   inheritAttrs: false,
@@ -251,63 +306,95 @@ interface Props {
   importId: number | null
   mappings: APIImportMapping[]
   detectedHeaders: string[]
+  /**
+   * Every importable target field of the model.
+   *
+   * Left empty (a backend that does not send a catalogue), the editor falls back
+   * to the fields the session already maps — the earlier behaviour, which cannot
+   * offer anything the uploaded file does not mention.
+   */
+  fields?: APIImportField[]
   loading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  fields: () => [],
   loading: false,
 })
 
 const emit = defineEmits<{
   close: []
-  start: [mappings: Record<string, string>]
+  start: [mappings: Record<string, string>, columns: MappingColumnUpdate[]]
 }>()
 
 const t = useTranslate()
 
-const localMappings = ref<Record<string, string | null>>({})
-
-const headerOptions = computed(() => {
-  return props.detectedHeaders.map((header) => ({
-    value: header,
-    label: header,
-  }))
+const {
+  localMappings,
+  rows,
+  visibleRows,
+  sections,
+  mappedCount,
+  requiredUnmappedCount,
+  allRequiredMapped,
+  scores,
+  search,
+  filterMode,
+  isExpanded,
+  toggleGroup,
+  headerOptions,
+  takenBy,
+  unmappedHeaders,
+  lastMove,
+  assignHeader,
+  undoMove,
+  revealRequiredUnmapped,
+  buildLocalMappings,
+  buildStartPayload,
+} = useColumnMapping({
+  mappings: () => props.mappings,
+  fields: () => catalogue.value,
+  detectedHeaders: () => props.detectedHeaders,
+  label: (field, fallback) => getFieldLabel(field, fallback),
+  sectionLabel: (group, fallback) => t(`group.${group}`, { default: fallback }),
 })
 
-const allRequiredMapped = computed(() => {
-  return dedupedMappings.value
-    .filter((m) => m.is_required)
-    .every((m) => !!localMappings.value[m.target_field])
+/**
+ * The field catalogue to render rows from.
+ *
+ * With no catalogue the editor derives its rows from the session's mappings, so
+ * a host on an older backend keeps the list it has always had instead of an
+ * empty table.
+ */
+const catalogue = computed<APIImportField[]>(() => {
+  if (props.fields.length) return props.fields
+
+  return props.mappings
+    .filter((mapping) => !!mapping.target_field)
+    .map((mapping) => ({
+      field: mapping.target_field,
+      label: mapping.target_field,
+      required: mapping.is_required,
+      type: 'string',
+      aliases: [],
+      group: null,
+      group_label: null,
+      group_index: null,
+      group_field: null,
+    }))
 })
 
-const mappedCount = computed(() => {
-  return dedupedMappings.value.filter((m) => !!localMappings.value[m.target_field]).length
-})
+/** The "header moved" notice, with its placeholders filled in. */
+const moveNotice = computed(() => {
+  const move = lastMove.value
+  if (!move) return ''
 
-const requiredUnmappedCount = computed(() => {
-  return dedupedMappings.value
-    .filter((m) => m.is_required && !localMappings.value[m.target_field])
-    .length
-})
+  const params = { header: move.header, field: getFieldLabel(move.from, move.from) }
 
-// Deduplicated mappings: filter null target_fields and pick best match per target
-const dedupedMappings = computed(() => {
-  const byTarget = new Map<string, APIImportMapping>()
-  for (const m of props.mappings) {
-    if (!m.target_field) continue
-    const existing = byTarget.get(m.target_field)
-    if (!existing) {
-      byTarget.set(m.target_field, m)
-    } else {
-      // Prefer confirmed, then higher confidence
-      if (m.is_confirmed && !existing.is_confirmed) {
-        byTarget.set(m.target_field, m)
-      } else if (m.is_confirmed === existing.is_confirmed && m.confidence_score > existing.confidence_score) {
-        byTarget.set(m.target_field, m)
-      }
-    }
-  }
-  return Array.from(byTarget.values())
+  return fillPlaceholders(
+    t('headerMovedFromField', { ...params, default: '"{header}" moved from {field}.' }),
+    params,
+  )
 })
 
 const fieldLabels: Record<string, string> = {
@@ -333,132 +420,47 @@ const fieldLabels: Record<string, string> = {
   level_name: 'Gerekli Seviye Adı',
 }
 
-function getFieldLabel(field: string): string {
-  // Allow host i18n to override per-field labels via `field.<target_field>`,
-  // falling back to the bundled Turkish defaults, then the raw field key.
-  return t(`field.${field}`, { default: fieldLabels[field] || field })
-}
-
 /**
- * Composite key for the score lookup below.
+ * A target field's display label.
  *
- * The unit separator cannot occur in a spreadsheet header or a field key, so no
- * pair of values can collide on it.
+ * Host i18n wins via `field.<target_field>`; failing that the backend's own
+ * label (handed in as the fallback), then the bundled Turkish defaults, then the
+ * raw field key.
  *
- * @param sourceColumn File header
- * @param targetField  Target field key
- * @return The map key for that pair
+ * @param field    Target field key
+ * @param fallback Label to use when the host has no entry for the key
+ * @return The label to render
  */
-function pairKey(sourceColumn: string, targetField: string): string {
-  return `${sourceColumn}\u001f${targetField}`
-}
-
-/**
- * Backend confidence per (source column, target field) pair.
- *
- * The session carries one mapping per detected header, so the score the backend
- * computed is recoverable for any pair it actually looked at — not just for the
- * column it ended up choosing.
- */
-const backendScores = computed(() => {
-  const byPair = new Map<string, number>()
-  for (const m of props.mappings) {
-    if (!m.target_field || !m.source_column) continue
-    byPair.set(pairKey(m.source_column, m.target_field), m.confidence_score)
-  }
-  return byPair
-})
-
-/**
- * Match score of what is currently selected, per target field.
- *
- * The stored `confidence_score` describes the column the backend picked, so it
- * goes stale the moment the user points a field somewhere else — leaving a
- * deliberate manual mapping wearing the old column's percentage. Pairs the
- * backend already scored keep its number verbatim (it knows the field's aliases,
- * which the client does not); anything else is scored locally with the same
- * formula. See {@link scoreColumnMatch}.
- */
-const scores = computed<Record<string, number>>(() => {
-  const result: Record<string, number> = {}
-
-  for (const mapping of dedupedMappings.value) {
-    const selected = localMappings.value[mapping.target_field]
-    if (!selected) {
-      result[mapping.target_field] = 0
-      continue
-    }
-
-    const known = backendScores.value.get(pairKey(selected, mapping.target_field))
-    result[mapping.target_field] =
-      known ??
-      scoreColumnMatch(selected, mapping.target_field, {
-        label: getFieldLabel(mapping.target_field),
-      }).score
-  }
-
-  return result
-})
-
-function scorePercent(score: number): number {
-  return Math.round(score * 100)
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 0.8) return 'bg-green-500'
-  if (score >= 0.4) return 'bg-orange-400'
-  return 'bg-red-400'
-}
-
-function getScoreTextColor(score: number): string {
-  if (score >= 0.8) return 'text-green-600'
-  if (score >= 0.4) return 'text-orange-500'
-  return 'text-red-500'
-}
-
-function handleMappingChange(targetField: string, value: string | null | undefined) {
-  localMappings.value[targetField] = value || null
+function getFieldLabel(field: string, fallback?: string): string {
+  return t(`field.${field}`, { default: fallback || fieldLabels[field] || field })
 }
 
 function handleStartImport() {
-  const result: Record<string, string> = {}
-  for (const [key, value] of Object.entries(localMappings.value)) {
-    if (value) result[key] = value
-  }
-  emit('start', result)
+  const payload = buildStartPayload()
+  emit('start', payload.mappings, payload.columns)
 }
 
-function buildLocalMappings() {
-  const mapped: Record<string, string | null> = {}
-  for (const m of dedupedMappings.value) {
-    if (m.is_confirmed || m.confidence_score >= 0.8) {
-      mapped[m.target_field] = m.source_column || null
-    } else {
-      mapped[m.target_field] = null
-    }
-  }
-  localMappings.value = mapped
-}
-
-// Populate localMappings from props when modal opens
+// Seed the selections when the modal opens. One component instance serves every
+// session, so the search box and the scope toggle start clean too.
 watch(
   () => props.show,
-  (newVal) => {
-    if (newVal && props.mappings.length > 0) {
-      buildLocalMappings()
-    }
+  (isOpen) => {
+    if (!isOpen) return
+
+    search.value = ''
+    filterMode.value = 'relevant'
+    buildLocalMappings()
   },
   { immediate: true },
 )
 
-watch(
-  () => props.mappings,
-  (newMappings) => {
-    if (props.show && newMappings.length > 0) {
-      buildLocalMappings()
-    }
-  },
-)
+// New mappings mean the session's proposals changed — applying a template
+// rewrites them — and a template has to win over what is on screen, so the
+// selections are rebuilt wholesale rather than merged. A catalogue that arrives
+// after the upload (fetched separately) lands here too.
+watch([() => props.mappings, () => props.fields], () => {
+  if (props.show) buildLocalMappings()
+})
 
 // ── Accessibility: focus trap + scroll lock ──────────────────────────────────
 // Self-contained port of the host BaseModal behavior so the library does not

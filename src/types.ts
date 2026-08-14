@@ -15,12 +15,28 @@ export interface PaginationMeta {
   total: number
 }
 
-export interface APIResponse<T = unknown> {
+/**
+ * Envelope `meta` of a single import session.
+ *
+ * The mapping editor has to offer target fields the uploaded file never
+ * mentions, and the session's own column mappings cannot describe those (they
+ * follow the file's headers). The backend therefore ships the model's whole
+ * field catalogue alongside the session — as a sibling of `data`, since it
+ * describes the model rather than the session.
+ */
+export interface ImportSessionMeta {
+  /** Every importable target field of the session's model. */
+  fields?: APIImportField[]
+  /** The model's repeating sections: section key => label. */
+  groups?: Record<string, string>
+}
+
+export interface APIResponse<T = unknown, M = PaginationMeta> {
   status: number
   message: string
   data: T
   errors?: unknown
-  meta?: PaginationMeta
+  meta?: M
 }
 
 // --- Status enums ---
@@ -75,6 +91,27 @@ export interface APIImportMapping {
   match_method: MappingMatchMethod
   is_required: boolean
   is_confirmed: boolean
+}
+
+/**
+ * An importable target field of a model, as the backend describes it.
+ *
+ * `group*` is filled for the leaves of a repeating section, whose keys read
+ * `<group>.<slot>.<leaf>` (e.g. `experience_information.2.company`) — that is
+ * what lets the mapping editor fold two hundred targets into a handful of
+ * collapsible sections. Flat fields report null for all four.
+ */
+export interface APIImportField {
+  field: string
+  label: string
+  required: boolean
+  type: string
+  /** Header spellings the backend's matcher accepts; also the editor's search keys. */
+  aliases: string[]
+  group: string | null
+  group_label: string | null
+  group_index: number | null
+  group_field: string | null
 }
 
 /**
@@ -135,10 +172,23 @@ export interface AllowedModel {
   name: string
 }
 
+/**
+ * A suggested target field for a column.
+ *
+ * Queried without a source column the endpoint doubles as the model's field
+ * catalogue, which is why the descriptive members are optional: they are only
+ * present on backends that carry them.
+ */
 export interface MappingSuggestion {
   field: string
   label: string
   confidence: number
+  required?: boolean
+  type?: string
+  group?: string | null
+  group_label?: string | null
+  group_index?: number | null
+  group_field?: string | null
 }
 
 // --- Request params / payloads ---
@@ -157,18 +207,23 @@ export interface InitializeImportPayload {
   options?: Record<string, unknown>
 }
 
-export interface UpdateMappingPayload {
+/**
+ * One column of a mapping save.
+ *
+ * A null `target_field` is an explicit "do not import this column": it releases
+ * a column the backend had auto-confirmed, which sending only the columns that
+ * *are* mapped could never do.
+ */
+export interface MappingColumnUpdate {
   source_column: string
-  target_field: string
+  target_field: string | null
   confirmed: boolean
 }
 
+export type UpdateMappingPayload = MappingColumnUpdate
+
 export interface BatchUpdateMappingsPayload {
-  columns: {
-    source_column: string
-    target_field: string
-    confirmed: boolean
-  }[]
+  columns: MappingColumnUpdate[]
 }
 
 export interface CreateImportTemplatePayload {

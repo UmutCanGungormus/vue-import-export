@@ -46,7 +46,7 @@ It is the **frontend counterpart** to the [`umutcangungormus/laravel-import-expo
 
 - 🧩 **Drop-in or composable** — one `<ImportManager>` for the whole flow, or compose the individual building blocks yourself.
 - 📤 **Drag-and-drop upload** — `<UploadInput>` with progress, preview, and validation.
-- 🔗 **Column mapping UI** — `<ColumnMappingModal>` confirms detected header→field mappings with confidence scores before processing.
+- 🔗 **Column mapping UI** — `<ColumnMappingModal>` lists every importable field with its confidence score, searchable and grouped, so detected mappings can be confirmed *and* the rest mapped by hand before processing.
 - 🔌 **Backend-agnostic** — components depend on the `ImportApiClient` interface, never on a concrete transport.
 - 🌍 **i18n-ready** — every label routes through an injectable `t()`; defaults to a passthrough so it works untranslated.
 - 🔔 **Notification-ready** — user-facing messages route through an injectable `notify()`; defaults to a no-op.
@@ -250,10 +250,14 @@ Page navigation + per-page selector.
 
 ### `<ColumnMappingModal>`
 
-Modal for confirming the detected column→field mappings before starting an import.
+Modal for reviewing and editing the column→field mappings before starting an import.
 
-- **Props:** `show: boolean`, `importId: number | null`, `mappings: APIImportMapping[]`, `detectedHeaders: string[]`, `loading?: boolean`.
-- **Events:** `close ()`, `start (Record<string, string>)`.
+Given `fields` — the model's full target-field catalogue — it lists **every** importable field rather than only the ones the uploaded file matched, so any field can be mapped by hand. It offers a field search, collapsible sections for repeating groups (driven by `group` / `group_index`), a "mapped + required" ↔ "all fields" scope toggle, and it names the file columns left unmapped. Without `fields` it falls back to listing the fields the session already maps.
+
+`ImportManager` supplies `fields` from the store, which reads them from the initialize response's `meta.fields` and falls back to `GET /v1/imports/{id}/mappings/suggestions`.
+
+- **Props:** `show: boolean`, `importId: number | null`, `mappings: APIImportMapping[]`, `detectedHeaders: string[]`, `fields?: APIImportField[]`, `loading?: boolean`.
+- **Events:** `close ()`, `start (Record<string, string>, MappingColumnUpdate[])` — the first argument is the target→header map, the second the column updates to persist. The latter includes the columns the user un-mapped (`target_field: null`), which the map cannot express: without them a column the backend auto-confirmed would keep importing.
 
 ### `<LogoUploadInput>`
 

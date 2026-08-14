@@ -22,7 +22,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useImportStore } from '../stores/import.js'
 import { useTranslate, useNotify } from '../adapters.js'
-import type { APIImport } from '../types.js'
+import type { APIImport, MappingColumnUpdate } from '../types.js'
 import UploadInput, { type UploadValue } from './UploadInput.vue'
 import ColumnMappingModal from './ColumnMappingModal.vue'
 import ImportPagination from './ImportPagination.vue'
@@ -260,7 +260,13 @@ async function handleUpload() {
     await importStore.fetchMappings(result.id)
   }
 
-  // Step 3: Open mapping modal.
+  // Step 3: Fetch the model's field catalogue if the upload response carried
+  // none, so the editor can still offer the fields the file does not mention.
+  if (!importStore.fieldCatalogue.length && result.id) {
+    await importStore.fetchFieldCatalogue(result.id)
+  }
+
+  // Step 4: Open mapping modal.
   showMappingModal.value = true
   selectedFile.value = null
   emit('uploaded', result)
@@ -271,21 +277,38 @@ function cancelUpload() {
   selectedFile.value = null
 }
 
-async function handleStartImport(mappingsData: Record<string, string>) {
+/**
+ * Persist the editor's mappings, then start processing.
+ *
+ * @param mappingsData Target field => file header, for every mapped field
+ * @param columns      The column updates to persist, including the columns the
+ *                     user un-mapped (which `mappingsData` cannot express).
+ *                     Absent when a host drives ColumnMappingModal itself on the
+ *                     older single-argument contract.
+ */
+async function handleStartImport(
+  mappingsData: Record<string, string>,
+  columns?: MappingColumnUpdate[],
+) {
   const sessionId = importStore.currentImportSession?.id
   if (!sessionId) return
 
   startingImport.value = true
   try {
     // Step 1: Save confirmed mappings.
-    const columns = Object.entries(mappingsData).map(
-      ([target_field, source_column]) => ({
-        source_column,
-        target_field,
-        confirmed: true,
-      }),
-    )
-    await importStore.batchUpdateMappings(sessionId, { columns })
+    const payload: MappingColumnUpdate[] =
+      columns?.length
+        ? columns
+        : Object.entries(mappingsData).map(([target_field, source_column]) => ({
+            source_column,
+            target_field,
+            confirmed: true,
+          }))
+
+    // Nothing to save is not an error, but an empty payload is rejected.
+    if (payload.length) {
+      await importStore.batchUpdateMappings(sessionId, { columns: payload })
+    }
 
     // Step 2: Start import processing.
     await importStore.startImport(sessionId)
@@ -782,6 +805,7 @@ function getStatusLabel(status: string): string {
       :show="showMappingModal"
       :import-id="importStore.currentImportSession?.id ?? null"
       :mappings="importStore.mappings"
+      :fields="importStore.fieldCatalogue"
       :detected-headers="importStore.currentImportSession?.detected_headers ?? []"
       :loading="startingImport"
       @close="handleCloseMappingModal"

@@ -16,6 +16,7 @@ import type {
   APIImportTemplate,
   APIFailureSummary,
   AllowedModel,
+  ImportSessionMeta,
   MappingSuggestion,
   ImportListParams,
   UpdateMappingPayload,
@@ -43,14 +44,18 @@ export interface ImportApiClient {
    * Create a new import session by uploading a file. `formData` must contain
    * at least `model` and `file`. `config` carries transport options such as
    * upload-progress callbacks.
+   *
+   * The envelope's `meta` carries the model's field catalogue when the backend
+   * supplies one (see {@link ImportSessionMeta}); the mapping editor needs it to
+   * offer target fields the uploaded file does not mention.
    */
   initializeImport(
     formData: FormData,
     config?: RequestConfig,
-  ): Promise<APIResponse<APIImport>>
+  ): Promise<APIResponse<APIImport, ImportSessionMeta>>
 
-  /** Fetch a single import session. */
-  getImport(id: number): Promise<APIResponse<APIImport>>
+  /** Fetch a single import session, with the same `meta` as initializeImport. */
+  getImport(id: number): Promise<APIResponse<APIImport, ImportSessionMeta>>
 
   /** Delete an import session. */
   deleteImport(id: number): Promise<APIResponse<null>>
@@ -132,7 +137,7 @@ export interface ImportApiClient {
   applyTemplate(
     sessionId: number,
     templateId: number,
-  ): Promise<APIResponse<APIImport>>
+  ): Promise<APIResponse<APIImport, ImportSessionMeta>>
 }
 
 /**
