@@ -1,6 +1,6 @@
 {
   "name": "@umut-can-gungormus/vue-import-export",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Vue 3 + TypeScript UI components and contract layer for the umutcangungormus/laravel-import-export backend (v1/imports API).",
   "type": "module",
   "license": "MIT",
