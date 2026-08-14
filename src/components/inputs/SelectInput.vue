@@ -89,6 +89,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { ChevronUpDownIcon, CheckIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useTranslate } from '../../adapters.js'
+import { useExclusiveDropdown } from './exclusiveDropdown.js'
 
 export interface SelectOption {
   value: string
@@ -123,7 +124,9 @@ const emit = defineEmits<{
 
 const t = useTranslate()
 
-const open = ref(false)
+// Opening one instance closes every other one, whatever the host does to the
+// click event on its way up. See {@link useExclusiveDropdown}.
+const { isOpen: open, close, toggle: toggleOpen } = useExclusiveDropdown()
 const query = ref('')
 const rootRef = ref<HTMLElement | null>(null)
 const searchRef = ref<HTMLInputElement | null>(null)
@@ -141,7 +144,7 @@ const filteredOptions = computed(() => {
 
 function toggle() {
   if (props.disabled) return
-  open.value = !open.value
+  toggleOpen()
 }
 
 /** Whether a clear affordance applies: enabled, and something to clear. */
@@ -151,7 +154,7 @@ const showClear = computed(
 
 function select(value: string | null) {
   emit('update:modelValue', value)
-  open.value = false
+  close()
 }
 
 /** Return the input to its unselected state. */
@@ -171,7 +174,7 @@ watch(open, async (isOpen) => {
 
 function onDocumentClick(event: MouseEvent) {
   if (rootRef.value && !rootRef.value.contains(event.target as Node)) {
-    open.value = false
+    close()
   }
 }
 
