@@ -44,7 +44,9 @@ import type {
   APIImportTemplate,
   APIFailureSummary,
   AllowedModel,
+  ImportSessionMeta,
   MappingSuggestion,
+  PaginationMeta,
   ImportListParams,
   UpdateMappingPayload,
   BatchUpdateMappingsPayload,
@@ -93,7 +95,10 @@ export interface CreateAxiosImportClientOptions {
   axiosInstance?: AxiosInstance
 }
 
-function unwrap<T>(response: { data: any; status: number }): APIResponse<T> {
+function unwrap<T, M = PaginationMeta>(response: {
+  data: any
+  status: number
+}): APIResponse<T, M> {
   const body = response.data
   return {
     data: body?.data ?? body,
@@ -238,8 +243,8 @@ export function createAxiosImportClient(
     async initializeImport(
       formData: FormData,
       config?: RequestConfig,
-    ): Promise<APIResponse<APIImport>> {
-      return unwrap<APIImport>(
+    ): Promise<APIResponse<APIImport, ImportSessionMeta>> {
+      return unwrap<APIImport, ImportSessionMeta>(
         await client.post(
           '/v1/imports/initialize',
           formData,
@@ -248,8 +253,8 @@ export function createAxiosImportClient(
       )
     },
 
-    async getImport(id: number): Promise<APIResponse<APIImport>> {
-      return unwrap<APIImport>(await client.get(`/v1/imports/${id}`))
+    async getImport(id: number): Promise<APIResponse<APIImport, ImportSessionMeta>> {
+      return unwrap<APIImport, ImportSessionMeta>(await client.get(`/v1/imports/${id}`))
     },
 
     async deleteImport(id: number): Promise<APIResponse<null>> {
@@ -377,8 +382,8 @@ export function createAxiosImportClient(
     async applyTemplate(
       sessionId: number,
       templateId: number,
-    ): Promise<APIResponse<APIImport>> {
-      return unwrap<APIImport>(
+    ): Promise<APIResponse<APIImport, ImportSessionMeta>> {
+      return unwrap<APIImport, ImportSessionMeta>(
         await client.post(
           `/v1/imports/${sessionId}/apply-template/${templateId}`,
         ),

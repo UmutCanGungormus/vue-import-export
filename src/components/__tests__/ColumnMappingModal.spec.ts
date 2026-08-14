@@ -152,6 +152,8 @@ describe('ColumnMappingModal clearing a selection', () => {
     await selectHeader(wrapper, 'email', 'E-posta')
     await wrapper.findAll('button').find((b) => b.text().includes('Start import'))!.trigger('click')
 
-    expect(wrapper.emitted('start')![0]).toEqual([{ email: 'E-posta', notes: 'Notlar' }])
+    // Argument 0 is the target=>header map hosts have always received; argument 1
+    // carries the column updates to persist (see the `fields` spec for those).
+    expect(wrapper.emitted('start')![0][0]).toEqual({ email: 'E-posta', notes: 'Notlar' })
   })
 })
