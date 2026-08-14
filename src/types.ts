@@ -35,9 +35,26 @@ export type ImportStatus =
   | 'mapping'
   | 'processing'
   | 'completed'
+  | 'completed_with_errors'
   | 'failed'
   | 'cancelled'
   | (string & {})
+
+/**
+ * Statuses at which an import is finished. The backend can finalise to any of
+ * these, so polling must stop — and the UI treat the row as done — on all of
+ * them, not just `completed`/`failed`.
+ */
+export const TERMINAL_IMPORT_STATUSES = [
+  'completed',
+  'completed_with_errors',
+  'failed',
+  'cancelled',
+] as const
+
+export function isTerminalImportStatus(status: string): boolean {
+  return (TERMINAL_IMPORT_STATUSES as readonly string[]).includes(status)
+}
 
 /** How a column→field mapping was derived by the backend. */
 export type MappingMatchMethod =

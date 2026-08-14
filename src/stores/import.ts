@@ -24,6 +24,7 @@ import type {
   UpdateMappingPayload,
   BatchUpdateMappingsPayload,
 } from '../types.js'
+import { isTerminalImportStatus } from '../types.js'
 
 export const useImportStore = defineStore('import', () => {
   // The injected API client (replaces the hardcoded `sdk.importAPI`).
@@ -176,7 +177,11 @@ export const useImportStore = defineStore('import', () => {
             failed_rows: Number(progress.failed_rows) || 0,
           }
         }
-        if (progress.status === 'completed' || progress.status === 'failed') {
+        // Stop on ANY terminal status — the backend also finalises to
+        // `completed_with_errors` (rows failed) and `cancelled`; treating only
+        // `completed`/`failed` as done left the row stuck on "processing" and
+        // polling forever.
+        if (isTerminalImportStatus(progress.status)) {
           stopPolling()
           await fetchImports()
         }

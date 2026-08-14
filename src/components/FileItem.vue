@@ -135,6 +135,8 @@ const statusClass = computed(() => {
   switch (props.item.status) {
     case 'completed':
       return 'bg-green-50 text-green-700'
+    case 'completed_with_errors':
+      return 'bg-amber-50 text-amber-700'
     case 'failed':
       return 'bg-red-50 text-red-700'
     case 'processing':

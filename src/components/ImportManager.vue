@@ -144,7 +144,12 @@ const statusOptions = computed(() => [
   { value: 'mapping', label: t('mapping', { default: 'Eşleştirme' }) },
   { value: 'processing', label: t('processing', { default: 'İşleniyor' }) },
   { value: 'completed', label: t('completed', { default: 'Tamamlandı' }) },
+  {
+    value: 'completed_with_errors',
+    label: t('completedWithErrors', { default: 'Hatalarla tamamlandı' }),
+  },
   { value: 'failed', label: t('failed', { default: 'Başarısız' }) },
+  { value: 'cancelled', label: t('cancelled', { default: 'İptal edildi' }) },
 ])
 
 const hasActiveFilters = computed(
