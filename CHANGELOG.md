@@ -4,6 +4,49 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-08
+
+### Added
+
+- **A target field can be fed by several file columns.** A field the backend
+  marks `multi` gets an "Add another column" control in `<ColumnMappingModal>`,
+  and a strategy picker deciding how the cells fold into one value: *Merged
+  text* (`merge`, joined with a space) or *JSON* (`json`, a
+  `{"column name": "cell"}` object). Columns fold in the order they appear in
+  the file, which is the order the backend combines them in.
+- `useColumnMapping` gained `extraColumns`, `strategyOf`, `assignExtraHeader`,
+  `addExtraColumn` and `setStrategy`, plus the exported
+  `DEFAULT_MULTI_STRATEGY` (`'merge'`) a target takes the moment a second
+  column is pointed at it. A session that already combines a target comes back
+  whole when the editor is reopened, in file order rather than in whichever
+  order the rows were saved.
+- New exported type `MultiColumnStrategy` (`'merge' | 'json'`), and
+  `TemplateMappingPayload` for a saved template's rows, which now carry
+  `multi_strategy` so a template of a combined target reapplies as one.
+- `MappingFieldRow` accepts `extras` and `strategy` props and emits
+  `assign-extra`, `add-column` and `set-strategy`. New translation keys, all
+  with English fallbacks: `selectAnotherColumn`, `addAnotherColumn`,
+  `combineColumns`, `combineMerge`, `combineJson`.
+- 11 further tests (`useColumnMapping.multi.spec.ts`,
+  `ColumnMappingModal.multi.spec.ts`) covering the fold order, the prefill from
+  an existing combined session, head promotion on clear, and the payload.
+
+### Changed
+
+- `APIImportMapping` gained an optional `multi_strategy`, `APIImportField` an
+  optional `multi`, and `MappingColumnUpdate` an optional `multi_strategy`
+  sent on every column of a combined target. All three are optional, so a
+  backend that does not send them behaves exactly as before.
+- `takenBy` counts a target's extra columns as taken, so the "already held by"
+  annotation and the move-with-undo behaviour cover combined targets too.
+- Clearing the first column of a combined target promotes the next one instead
+  of leaving the row with a hole where its head was.
+
+### Requires
+
+- `umutcangungormus/laravel-import-export` **v1.1.0** for the backend half.
+  Older backends ignore `multi_strategy` and keep one column per target.
+
 ## [1.0.2] - 2026-08-14
 
 ### Added

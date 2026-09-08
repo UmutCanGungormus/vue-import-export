@@ -47,6 +47,7 @@ It is the **frontend counterpart** to the [`umutcangungormus/laravel-import-expo
 - 🧩 **Drop-in or composable** — one `<ImportManager>` for the whole flow, or compose the individual building blocks yourself.
 - 📤 **Drag-and-drop upload** — `<UploadInput>` with progress, preview, and validation.
 - 🔗 **Column mapping UI** — `<ColumnMappingModal>` lists every importable field with its confidence score, searchable and grouped, so detected mappings can be confirmed *and* the rest mapped by hand before processing.
+- 🧵 **Multi-column targets** — a field the backend marks `multi` can be fed by several file columns at once, combined as merged text or as JSON.
 - 🔌 **Backend-agnostic** — components depend on the `ImportApiClient` interface, never on a concrete transport.
 - 🌍 **i18n-ready** — every label routes through an injectable `t()`; defaults to a passthrough so it works untranslated.
 - 🔔 **Notification-ready** — user-facing messages route through an injectable `notify()`; defaults to a no-op.
@@ -255,6 +256,21 @@ Modal for reviewing and editing the column→field mappings before starting an i
 Given `fields` — the model's full target-field catalogue — it lists **every** importable field rather than only the ones the uploaded file matched, so any field can be mapped by hand. It offers a field search, collapsible sections for repeating groups (driven by `group` / `group_index`), a "mapped + required" ↔ "all fields" scope toggle, and it names the file columns left unmapped. Without `fields` it falls back to listing the fields the session already maps.
 
 `ImportManager` supplies `fields` from the store, which reads them from the initialize response's `meta.fields` and falls back to `GET /v1/imports/{id}/mappings/suggestions`.
+
+A field the backend marks `multi` accepts more than one file column. The row
+grows an **Add another column** control and a strategy picker deciding how the
+cells fold into a single value:
+
+| Strategy | `Street` + `No` + `District` becomes |
+| --- | --- |
+| **Merged text** (`merge`, default) | `Main St 12 Kadıköy` |
+| **JSON** (`json`) | `{"Street":"Main St","No":"12","District":"Kadıköy"}` |
+
+Columns fold in the order they appear in the file. Clearing the first column
+promotes the next one, and every column of a combined target counts as taken,
+so pointing one at another field still moves it with an undo. Requires
+`umutcangungormus/laravel-import-export` v1.1.0 or newer; older backends ignore
+the strategy and keep one column per target.
 
 - **Props:** `show: boolean`, `importId: number | null`, `mappings: APIImportMapping[]`, `detectedHeaders: string[]`, `fields?: APIImportField[]`, `loading?: boolean`.
 - **Events:** `close ()`, `start (Record<string, string>, MappingColumnUpdate[])` — the first argument is the target→header map, the second the column updates to persist. The latter includes the columns the user un-mapped (`target_field: null`), which the map cannot express: without them a column the backend auto-confirmed would keep importing.
