@@ -15,13 +15,21 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { SelectOption } from '../components/inputs/SelectInput.vue'
 import { scoreColumnMatch } from '../utils/columnMatch.js'
 import { foldText } from '../utils/i18n.js'
-import type { APIImportField, APIImportMapping, MappingColumnUpdate } from '../types.js'
+import type {
+  APIImportField,
+  APIImportMapping,
+  MappingColumnUpdate,
+  MultiColumnStrategy,
+} from '../types.js'
 
 /** Backend confidence at or above which a proposal is treated as settled. */
 const AUTO_CONFIRM_THRESHOLD = 0.8
 
 /** Section key standing for "belongs to no repeating section". */
 export const FLAT_SECTION = ''
+
+/** What a target gets the moment a second column is pointed at it. */
+export const DEFAULT_MULTI_STRATEGY: MultiColumnStrategy = 'merge'
 
 /** One row of the editor: a target field and what it is currently mapped to. */
 export interface MappingRowModel {
@@ -33,6 +41,8 @@ export interface MappingRowModel {
   groupIndex: number | null
   groupField: string | null
   aliases: string[]
+  /** Whether the field accepts more than one file column at once. */
+  multi: boolean
   /** Whether this session (or an applied template) proposed a column for the field. */
   proposed: boolean
   proposedColumn: string | null
@@ -92,6 +102,10 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
 
   /** Target field => selected file header. */
   const localMappings = ref<Record<string, string | null>>({})
+  /** Target field => the columns beyond the first, in the order they are shown. */
+  const extraColumns = ref<Record<string, (string | null)[]>>({})
+  /** Target field => how its columns combine, for the targets fed by several. */
+  const strategies = ref<Record<string, MultiColumnStrategy>>({})
   const search = ref('')
   const filterMode = ref<'relevant' | 'all'>('relevant')
   const expandedGroups = ref<Record<string, boolean>>({})
@@ -148,6 +162,37 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
   })
 
   /**
+   * The targets the session already feeds from more than one column.
+   *
+   * Keyed by target, headers in file order — the order the backend combines
+   * them in — so reopening the editor shows the sequence the import produces
+   * rather than the order the rows happened to be saved in.
+   */
+  const combinedColumnsByTarget = computed(() => {
+    const order = new Map(detectedHeaders().map((header, index) => [header, index]))
+    const byTarget = new Map<string, { headers: string[]; strategy: MultiColumnStrategy | null }>()
+
+    for (const mapping of mappings()) {
+      if (!mapping.target_field || !mapping.source_column || !mapping.multi_strategy) continue
+
+      const entry = byTarget.get(mapping.target_field) ?? {
+        headers: [] as string[],
+        strategy: null as MultiColumnStrategy | null,
+      }
+
+      entry.headers.push(mapping.source_column)
+      entry.strategy = mapping.multi_strategy
+      byTarget.set(mapping.target_field, entry)
+    }
+
+    for (const entry of byTarget.values()) {
+      entry.headers.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0))
+    }
+
+    return byTarget
+  })
+
+  /**
    * Every row the editor can show: the catalogue, plus any target the session
    * maps that the catalogue does not describe.
    *
@@ -174,6 +219,7 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
           label: target,
           required: proposalByTarget.value.get(target)?.is_required ?? false,
           type: 'string',
+          multi: false,
           aliases: [],
           group: null,
           group_label: null,
@@ -256,13 +302,14 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
     return options
   })
 
-  /** Header => label of the field currently holding it. */
+  /** Header => label of the field currently holding it, extra columns included. */
   const takenBy = computed(() => {
     const owners: Record<string, string> = {}
 
     for (const row of rows.value) {
-      const header = localMappings.value[row.target]
-      if (header) owners[header] = row.label
+      for (const header of columnsOf(row.target)) {
+        if (header) owners[header] = row.label
+      }
     }
 
     return owners
@@ -336,18 +383,83 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
     const next = header || null
     lastMove.value = null
 
-    if (next) {
-      const previous = rows.value.find(
-        (row) => row.target !== target && localMappings.value[row.target] === next,
-      )
-
-      if (previous) {
-        localMappings.value[previous.target] = null
-        lastMove.value = { header: next, from: previous.target, to: target }
-      }
-    }
+    if (next) releaseHeader(next, target)
 
     localMappings.value[target] = next
+
+    // The first column is what the row is; losing it promotes the next one
+    // rather than leaving a combined target with a hole where its head was.
+    if (!next) {
+      const promoted = (extraColumns.value[target] ?? []).filter(Boolean) as string[]
+      localMappings.value[target] = promoted.shift() ?? null
+      setExtras(target, promoted)
+    }
+
+    syncStrategy(target)
+  }
+
+  /**
+   * Sets one of a target's additional columns.
+   *
+   * @param target Target field being mapped
+   * @param index  Position among the extra columns
+   * @param header File header, or null to drop that column
+   */
+  function assignExtraHeader(target: string, index: number, header: string | null): void {
+    const next = header || null
+    lastMove.value = null
+
+    if (next) releaseHeader(next, target)
+
+    const extras = [...(extraColumns.value[target] ?? [])]
+
+    if (next === null) {
+      extras.splice(index, 1)
+    } else {
+      extras[index] = next
+    }
+
+    setExtras(target, extras)
+    syncStrategy(target)
+  }
+
+  /**
+   * Opens an empty picker for one more column on a target.
+   *
+   * @param target Target field to widen
+   */
+  function addExtraColumn(target: string): void {
+    setExtras(target, [...(extraColumns.value[target] ?? []), null])
+  }
+
+  /**
+   * Chooses how a target's columns combine.
+   *
+   * @param target   Target field being mapped
+   * @param strategy `merge` or `json`
+   */
+  function setStrategy(target: string, strategy: MultiColumnStrategy): void {
+    strategies.value = { ...strategies.value, [target]: strategy }
+  }
+
+  /**
+   * Every column feeding a target, the first one first.
+   *
+   * @param target Target field
+   * @return The selected headers, with a null for each empty picker
+   */
+  function columnsOf(target: string): (string | null)[] {
+    return [localMappings.value[target] ?? null, ...(extraColumns.value[target] ?? [])]
+  }
+
+  /**
+   * The combine strategy a target will be saved with, if any.
+   *
+   * @param target Target field
+   * @return The strategy, or null while the target is fed by one column
+   */
+  function strategyOf(target: string): MultiColumnStrategy | null {
+    return filledColumns(target).length > 1 ? (strategies.value[target] ?? DEFAULT_MULTI_STRATEGY) : null
   }
 
   /** Puts a moved header back where it was, and clears the notice. */
@@ -389,9 +501,26 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
    */
   function buildLocalMappings(): void {
     const selected: Record<string, string | null> = {}
+    const extras: Record<string, (string | null)[]> = {}
+    const combines: Record<string, MultiColumnStrategy> = {}
     const claimed = new Set<string>()
+    const combined = combinedColumnsByTarget.value
 
     for (const row of rows.value) {
+      const columns = combined.get(row.target)
+
+      // A target the session already combines comes back whole, in file order,
+      // so reopening the editor shows the pair the user saved rather than
+      // whichever column happened to win the prefill.
+      if (columns && row.multi) {
+        const [first, ...rest] = columns.headers
+        selected[row.target] = first ?? null
+        for (const header of columns.headers) claimed.add(header)
+        if (rest.length) extras[row.target] = rest
+        if (columns.strategy) combines[row.target] = columns.strategy
+        continue
+      }
+
       const column = row.prefill
 
       // Prefills come from mappings keyed by column, so a clash is not expected;
@@ -405,6 +534,8 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
     }
 
     localMappings.value = selected
+    extraColumns.value = extras
+    strategies.value = combines
     lastMove.value = null
 
     const expanded: Record<string, boolean> = {}
@@ -435,11 +566,23 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
     const columns = new Map<string, MappingColumnUpdate>()
 
     for (const row of rows.value) {
-      const header = localMappings.value[row.target]
-      if (!header) continue
+      const headers = filledColumns(row.target)
+      if (!headers.length) continue
 
-      selected[row.target] = header
-      columns.set(header, { source_column: header, target_field: row.target, confirmed: true })
+      const strategy = strategyOf(row.target)
+      selected[row.target] = headers[0]
+
+      for (const header of headers) {
+        // The key is left off a single-column mapping rather than sent as null:
+        // it is the flag that says "this target is combined", and a backend that
+        // predates the feature must keep seeing the payload it always saw.
+        columns.set(header, {
+          source_column: header,
+          target_field: row.target,
+          confirmed: true,
+          ...(strategy ? { multi_strategy: strategy } : {}),
+        })
+      }
     }
 
     for (const mapping of mappings()) {
@@ -460,6 +603,93 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
   // ── Internals ──────────────────────────────────────────────────────────────
 
   /**
+   * Takes a header off whichever other target is holding it.
+   *
+   * A column can only feed one target — the mapping is keyed by column — so two
+   * fields claiming one header is not a state the backend can store. Moving it
+   * beats rejecting the pick, and only a moved *first* column is offered for
+   * undo: putting a released extra back is a two-part change the notice cannot
+   * describe in one line.
+   *
+   * @param header      The header being claimed
+   * @param keepTarget  The target claiming it, which is left alone
+   */
+  function releaseHeader(header: string, keepTarget: string): void {
+    for (const row of rows.value) {
+      if (row.target === keepTarget) continue
+
+      if (localMappings.value[row.target] === header) {
+        localMappings.value[row.target] = null
+        lastMove.value = { header, from: row.target, to: keepTarget }
+        syncStrategy(row.target)
+        continue
+      }
+
+      const extras = extraColumns.value[row.target]
+      if (extras?.includes(header)) {
+        setExtras(
+          row.target,
+          extras.filter((column) => column !== header),
+        )
+        syncStrategy(row.target)
+      }
+    }
+  }
+
+  /**
+   * Writes a target's extra columns, forgetting the key once none are left.
+   *
+   * @param target Target field
+   * @param extras The columns beyond the first
+   */
+  function setExtras(target: string, extras: (string | null)[]): void {
+    const next = { ...extraColumns.value }
+
+    if (extras.length === 0) {
+      delete next[target]
+    } else {
+      next[target] = extras
+    }
+
+    extraColumns.value = next
+  }
+
+  /**
+   * The headers actually chosen for a target, empty pickers dropped.
+   *
+   * @param target Target field
+   */
+  function filledColumns(target: string): string[] {
+    return columnsOf(target).filter((column): column is string => !!column)
+  }
+
+  /**
+   * Keeps the stored strategy in step with how many columns the target has.
+   *
+   * A target that drops back to one column must forget its strategy: the save
+   * payload reads it back, and a leftover would ask the backend to combine a
+   * single column.
+   *
+   * @param target Target field
+   */
+  function syncStrategy(target: string): void {
+    const combined = filledColumns(target).length > 1
+    const has = target in strategies.value
+
+    if (combined === has) return
+
+    const next = { ...strategies.value }
+
+    if (combined) {
+      next[target] = DEFAULT_MULTI_STRATEGY
+    } else {
+      delete next[target]
+    }
+
+    strategies.value = next
+  }
+
+  /**
    * Expands a catalogue entry into a row, including its proposal and prefill.
    *
    * @param field The catalogue entry
@@ -478,6 +708,7 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
       groupIndex: field.group_index,
       groupField: field.group_field,
       aliases: field.aliases ?? [],
+      multi: field.multi ?? false,
       proposed: !!proposal,
       proposedColumn: proposal?.source_column ?? null,
       proposedScore: proposal?.confidence_score ?? 0,
@@ -592,6 +823,13 @@ export function useColumnMapping(options: UseColumnMappingOptions) {
 
   return {
     localMappings: localMappings as Ref<Record<string, string | null>>,
+    extraColumns,
+    strategies,
+    columnsOf,
+    strategyOf,
+    assignExtraHeader,
+    addExtraColumn,
+    setStrategy,
     rows,
     visibleRows,
     sections,

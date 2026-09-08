@@ -12,6 +12,7 @@ export type {
   APIResponse,
   ImportStatus,
   MappingMatchMethod,
+  MultiColumnStrategy,
   APIImportMapping,
   APIImportField,
   APIImport,

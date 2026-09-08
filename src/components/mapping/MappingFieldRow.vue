@@ -26,6 +26,48 @@
         :clearable="true"
         @update:modelValue="emit('assign', row.target, $event ?? null)"
       />
+
+      <!-- Additional columns, for the free-text targets that accept them -->
+      <template v-if="row.multi">
+        <SelectInput
+          v-for="(extra, index) in extras"
+          :key="index"
+          class="mt-2"
+          :modelValue="extra"
+          :options="optionsFor(extra)"
+          :placeholder="t('selectAnotherColumn', { default: 'Select another column' })"
+          :searchable="true"
+          :clearable="true"
+          @update:modelValue="emit('assignExtra', row.target, index, $event ?? null)"
+        />
+
+        <button
+          v-if="canAddColumn"
+          type="button"
+          class="mt-2 text-xs font-medium text-[#155EEF] hover:underline"
+          @click="emit('addColumn', row.target)"
+        >
+          + {{ t('addAnotherColumn', { default: 'Add another column' }) }}
+        </button>
+
+        <div v-if="strategy" class="mt-2 flex items-center gap-1">
+          <span class="text-[11px] text-[#9AA4B2]">
+            {{ t('combineColumns', { default: 'Combine as' }) }}
+          </span>
+          <button
+            v-for="option in STRATEGIES"
+            :key="option.value"
+            type="button"
+            class="px-2 py-0.5 text-[11px] rounded border transition-colors"
+            :class="strategy === option.value
+              ? 'border-[#155EEF] bg-[#EFF4FF] text-[#155EEF] font-medium'
+              : 'border-gray-200 text-[#697586] hover:border-gray-300'"
+            @click="emit('setStrategy', row.target, option.value)"
+          >
+            {{ t(option.key, { default: option.fallback }) }}
+          </button>
+        </div>
+      </template>
     </td>
 
     <!-- Match score -->
@@ -84,6 +126,7 @@ import SelectInput, { type SelectOption } from '../inputs/SelectInput.vue'
 import { useTranslate } from '../../adapters.js'
 import { fillPlaceholders } from '../../utils/i18n.js'
 import type { MappingRowModel } from '../../composables/useColumnMapping.js'
+import type { MultiColumnStrategy } from '../../types.js'
 
 const props = defineProps<{
   row: MappingRowModel
@@ -93,13 +136,43 @@ const props = defineProps<{
   headerOptions: SelectOption[]
   /** Header => label of the field currently holding it. */
   takenBy: Record<string, string>
+  /** The columns beyond the first, for a target that accepts several. */
+  extras?: (string | null)[]
+  /** How this target's columns combine, or null while it has only one. */
+  strategy?: MultiColumnStrategy | null
 }>()
 
 const emit = defineEmits<{
   assign: [target: string, header: string | null]
+  assignExtra: [target: string, index: number, header: string | null]
+  addColumn: [target: string]
+  setStrategy: [target: string, strategy: MultiColumnStrategy]
 }>()
 
 const t = useTranslate()
+
+/** The combine strategies offered, with the labels a host may translate. */
+const STRATEGIES: { value: MultiColumnStrategy; key: string; fallback: string }[] = [
+  { value: 'merge', key: 'combineMerge', fallback: 'Merged text' },
+  { value: 'json', key: 'combineJson', fallback: 'JSON' },
+]
+
+const extras = computed(() => props.extras ?? [])
+
+/**
+ * Whether one more column may be added.
+ *
+ * A row with nothing in its first picker has nothing to combine yet, and a
+ * trailing empty picker is the one already waiting to be filled.
+ */
+const canAddColumn = computed(
+  () => !!props.selected && !extras.value.some((column) => !column),
+)
+
+/** Every header this row is already feeding its target with. */
+const ownColumns = computed(() =>
+  [props.selected, ...extras.value].filter((column): column is string => !!column),
+)
 
 /**
  * The row's picker options, annotating headers another field already holds.
@@ -108,11 +181,25 @@ const t = useTranslate()
  * not a barrier: in a list this long, a disabled option would leave the user
  * hunting for the owner with no way to act from here.
  */
-const options = computed<SelectOption[]>(() =>
-  props.headerOptions.map((option) => {
+const options = computed<SelectOption[]>(() => optionsFor(props.selected))
+
+/**
+ * The picker options for one of the row's columns.
+ *
+ * @param current The header that picker currently holds, which is never annotated
+ */
+function optionsFor(current: string | null): SelectOption[] {
+  const own = new Set(ownColumns.value)
+
+  return props.headerOptions.flatMap((option) => {
+    // A column this row already feeds the target with cannot be picked twice,
+    // and annotating it as "taken" by the row you are looking at reads as a
+    // clash rather than as what it is.
+    if (option.value !== current && own.has(option.value)) return []
+
     const owner = props.takenBy[option.value]
 
-    if (!owner || option.value === props.selected) return option
+    if (!owner || option.value === current) return option
 
     return {
       value: option.value,
@@ -121,8 +208,8 @@ const options = computed<SelectOption[]>(() =>
         { field: owner },
       )}`,
     }
-  }),
-)
+  })
+}
 
 const scorePercent = computed(() => Math.round(props.score * 100))
 

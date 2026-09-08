@@ -198,7 +198,12 @@
                           :score="scores[row.target] ?? 0"
                           :header-options="headerOptions"
                           :taken-by="takenBy"
+                          :extras="extraColumns[row.target]"
+                          :strategy="strategyOf(row.target)"
                           @assign="assignHeader"
+                          @assign-extra="assignExtraHeader"
+                          @add-column="addExtraColumn"
+                          @set-strategy="setStrategy"
                         />
                       </template>
                     </template>
@@ -331,6 +336,11 @@ const t = useTranslate()
 
 const {
   localMappings,
+  extraColumns,
+  strategyOf,
+  assignExtraHeader,
+  addExtraColumn,
+  setStrategy,
   rows,
   visibleRows,
   sections,
