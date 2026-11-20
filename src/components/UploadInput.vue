@@ -257,11 +257,27 @@ const defaultAcceptTypes = {
 
 const acceptedTypes = computed(() => {
   const acceptKey = props.accept || ".pdf,.doc,.docx";
-  return (
-    defaultAcceptTypes[acceptKey as keyof typeof defaultAcceptTypes] ||
-    defaultAcceptTypes[".pdf,.doc,.docx"]
-  );
+  // An accept list without a preset is matched by extension only (isAcceptedFile).
+  return (defaultAcceptTypes[acceptKey as keyof typeof defaultAcceptTypes] ?? []) as string[];
 });
+
+/** Extensions from the `accept` list (".xlsx,.csv" → [".xlsx", ".csv"]). */
+const acceptedExtensions = computed(() =>
+  (props.accept || ".pdf,.doc,.docx")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.startsWith(".")),
+);
+
+/**
+ * A file is accepted when its MIME type is known for the accept list OR its extension is listed.
+ * Browsers report CSV inconsistently ("text/csv", "application/vnd.ms-excel", "text/plain" or ""),
+ * so the extension is the reliable signal for spreadsheets.
+ */
+function isAcceptedFile(f: File): boolean {
+  const ext = "." + (f.name.split(".").pop() ?? "").toLowerCase();
+  return acceptedTypes.value.includes(f.type) || acceptedExtensions.value.includes(ext);
+}
 
 const formatInfoText = computed(() => {
   // Show a dedicated format hint when video files are accepted
@@ -360,7 +376,7 @@ function handleFile(e: Event | DragEvent) {
     selectedFile = (e.target as HTMLInputElement).files?.[0] || null;
   }
 
-  if (!selectedFile || !acceptedTypes.value.includes(selectedFile.type)) {
+  if (!selectedFile || !isAcceptedFile(selectedFile)) {
     notify({ type: "error", message: t("cvUploadInvalidFileType") });
     if (fileInputRef.value) {
       fileInputRef.value.value = "";

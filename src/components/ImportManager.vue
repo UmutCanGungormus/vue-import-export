@@ -61,6 +61,10 @@ const props = withDefaults(
     autoFetch?: boolean
     /** Default model used for the "Export all" action when no filter is set. */
     defaultExportModel?: string
+    /** File extensions the upload area accepts (comma-separated). Defaults to spreadsheets. */
+    accept?: string
+    /** Hint under the upload area; defaults to the translated `uploadFormatInfo` ("XLSX, XLS or CSV"). */
+    formatInfo?: string
   }>(),
   {
     title: '',
@@ -70,6 +74,8 @@ const props = withDefaults(
     initialSearch: '',
     autoFetch: true,
     defaultExportModel: 'App\\Models\\User',
+    accept: '.xlsx,.xls,.csv',
+    formatInfo: '',
   },
 )
 
@@ -543,8 +549,8 @@ function getStatusLabel(status: string): string {
               v-else
               ref="uploadInputRef"
               v-model="selectedFile"
-              :accept="'.pdf,.docx,.xlsx,.csv'"
-              :formatInfo="'.pdf .docx .xlsx .csv - Max 16MB'"
+              :accept="accept"
+              :formatInfo="formatInfo || t('uploadFormatInfo', { default: 'XLSX, XLS or CSV' })"
               :instantUpload="true"
               height="160px"
             />

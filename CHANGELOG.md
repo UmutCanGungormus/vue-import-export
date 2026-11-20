@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-11-21
+
+### Added
+
+- **`<ImportManager>` takes `accept` and `formatInfo` props.** The upload area no longer hard-codes
+  `.pdf .docx .xlsx .csv - Max 16MB`; it defaults to spreadsheets (`.xlsx,.xls,.csv`) and a translated
+  `uploadFormatInfo` hint, and hosts can pass their own list and text.
+
+### Fixed
+
+- **CSV files are no longer rejected by MIME type.** Browsers report CSV as `text/csv`,
+  `application/vnd.ms-excel`, `text/plain` or an empty string; `<UploadInput>` now accepts a file when
+  its MIME type matches the preset *or* its extension is in the `accept` list. An `accept` list without
+  a preset no longer silently falls back to the PDF/Word MIME list.
+
 ## [1.1.0] - 2026-09-08
 
 ### Added
