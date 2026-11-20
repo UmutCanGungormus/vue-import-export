@@ -155,6 +155,12 @@ function onUploaded(session: APIImport) {
 </template>
 ```
 
+#### Upload file types
+
+`<ImportManager>` accepts spreadsheets by default (`accept=".xlsx,.xls,.csv"`); pass `accept` and `formatInfo`
+to change the list and the hint under the upload area. Files are matched by MIME type *or* extension, so CSVs
+reported as `application/vnd.ms-excel` or with an empty type still upload.
+
 ### Individual components
 
 Every building block is exported, so you can compose your own layout:
